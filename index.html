@@ -4555,6 +4555,111 @@
                 postupci: []
             });
 
+            // Print otpremnica/predračun
+            const printOtpremnica = (nalog) => {
+                const ukupnoBezPDV = (nalog.artikli || []).reduce((sum, a) => sum + (parseFloat(a.cijena || 0) * parseFloat(a.kolicina || 0)), 0);
+                const pdv = ukupnoBezPDV * 0.25;
+                const ukupnoSaPDV = ukupnoBezPDV + pdv;
+                
+                let artikliRows = '';
+                (nalog.artikli || []).forEach(art => {
+                    const cijenaBezPDV = parseFloat(art.cijena) || 0;
+                    const kol = parseFloat(art.kolicina) || 0;
+                    const pdvIznos = cijenaBezPDV * 0.25;
+                    const cijenaSaPDV = cijenaBezPDV + pdvIznos;
+                    const vrijednost = cijenaSaPDV * kol;
+                    const napomena = [art.format, art.opis].filter(Boolean).join(' - ');
+                    
+                    artikliRows += '<tr><td>' + 
+                        (art.sifra ? '<span style="color:#666;">(' + art.sifra + ')</span> ' : '') +
+                        '<strong>' + (art.naziv || '') + '</strong>' + 
+                        (art.kpdSifra ? '<div style="font-size:8px;color:#888;">KPD: ' + art.kpdSifra + '</div>' : '') +
+                        (napomena ? '<div class="napomena">' + napomena + '</div>' : '') +
+                        '</td><td class="right">' + kol.toFixed(2) + ' ' + (art.jedinica || 'kom') + 
+                        '</td><td class="right">' + cijenaBezPDV.toFixed(2) + 
+                        '</td><td class="right">' + pdvIznos.toFixed(2) + ' (25%)' +
+                        '</td><td class="right">' + cijenaSaPDV.toFixed(2) + 
+                        '</td><td class="right">' + vrijednost.toFixed(2) + '</td></tr>';
+                });
+                
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(
+                    '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Otpremnica ' + nalog.broj + '</title>' +
+                    '<style>' +
+                    '* { margin: 0; padding: 0; box-sizing: border-box; }' +
+                    'body { font-family: Arial, sans-serif; font-size: 11px; padding: 15mm; color: #333; }' +
+                    '.header { display: flex; justify-content: space-between; margin-bottom: 20px; }' +
+                    '.logo { font-size: 24px; font-weight: bold; }' +
+                    '.logo-sub { font-size: 10px; color: #666; }' +
+                    '.company-info { font-size: 9px; line-height: 1.4; }' +
+                    '.document-title { font-size: 22px; font-weight: bold; text-align: center; margin: 20px 0 10px 0; }' +
+                    '.client-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; min-height: 80px; }' +
+                    '.client-name { font-weight: bold; font-size: 13px; margin-bottom: 5px; }' +
+                    '.doc-info { margin-bottom: 15px; }' +
+                    '.doc-info-row { display: flex; margin-bottom: 3px; }' +
+                    '.doc-info-label { width: 100px; font-weight: bold; }' +
+                    'table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }' +
+                    'th { background: #f5f5f5; border: 1px solid #ccc; padding: 8px 5px; text-align: left; font-size: 10px; font-weight: bold; }' +
+                    'td { border: 1px solid #ccc; padding: 6px 5px; vertical-align: top; }' +
+                    '.right { text-align: right; }' +
+                    '.napomena { font-size: 9px; color: #555; font-style: italic; margin-top: 3px; }' +
+                    '.totals { margin-left: auto; width: 250px; }' +
+                    '.total-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; }' +
+                    '.total-row.final { font-weight: bold; font-size: 14px; border-bottom: 2px solid #333; border-top: 2px solid #333; padding: 8px 0; }' +
+                    '.footer { margin-top: 30px; font-size: 9px; }' +
+                    '.signatures { display: flex; justify-content: space-between; margin-top: 40px; }' +
+                    '.signature-box { width: 200px; text-align: center; }' +
+                    '.signature-line { border-top: 1px solid #333; margin-top: 40px; padding-top: 5px; }' +
+                    '.footer-note { font-size: 8px; color: #666; text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; }' +
+                    '.contact-footer { text-align: center; font-size: 8px; color: #666; margin-top: 10px; }' +
+                    '@media print { body { padding: 10mm; } @page { margin: 10mm; } }' +
+                    '</style></head><body>' +
+                    '<div class="header"><div>' +
+                    '<div class="logo">SIGNALprint</div>' +
+                    '<div class="logo-sub">trgovina, usluge, proizvodnja</div>' +
+                    '<div class="company-info" style="margin-top: 5px;">vl. Tihomir Borovčak<br>Naselje Borovčaki 8<br>HR-49210 Zabok<br><br>OIB 52276562396<br><br>IBAN ZABA: HR8923600001101163526<br>IBAN PBZ: HR7723400091160234176</div>' +
+                    '</div><div style="text-align: right;"><div class="client-box">' +
+                    '<div class="client-name">' + (nalog.klijentNaziv || '') + '</div>' +
+                    (nalog.kontaktOsoba ? '<div>' + nalog.kontaktOsoba + '</div>' : '') +
+                    (nalog.telefon ? '<div>Tel: ' + nalog.telefon + '</div>' : '') +
+                    (nalog.email ? '<div>' + nalog.email + '</div>' : '') +
+                    '</div></div></div>' +
+                    '<div class="document-title">OTPREMNICA - PREDRAČUN</div>' +
+                    '<div style="display: flex; justify-content: space-between;"><div class="doc-info">' +
+                    '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + nalog.broj + '</span></div>' +
+                    '<div class="doc-info-row"><span class="doc-info-label">Mjesto:</span> <span>Zabok</span></div>' +
+                    '<div class="doc-info-row"><span class="doc-info-label">Datum:</span> <span>' + new Date(nalog.datum).toLocaleDateString('hr-HR') + '</span></div>' +
+                    (nalog.rokIzrade ? '<div class="doc-info-row"><span class="doc-info-label">Rok izrade:</span> <span>' + new Date(nalog.rokIzrade).toLocaleDateString('hr-HR') + '</span></div>' : '') +
+                    '</div><div class="doc-info">' +
+                    (nalog.brojRacuna ? '<div class="doc-info-row"><span class="doc-info-label">Broj računa:</span> <span>' + nalog.brojRacuna + '</span></div>' : '') +
+                    '<div class="doc-info-row"><span class="doc-info-label">Naziv:</span> <span>' + (nalog.nazivNaloga || '') + '</span></div>' +
+                    '</div></div>' +
+                    '<table><thead><tr>' +
+                    '<th style="width: 40%;">Vrsta robe odnosno usluga</th>' +
+                    '<th class="right" style="width: 12%;">Količina</th>' +
+                    '<th class="right" style="width: 12%;">Cijena</th>' +
+                    '<th class="right" style="width: 12%;">PDV</th>' +
+                    '<th class="right" style="width: 12%;">Cijena + PDV</th>' +
+                    '<th class="right" style="width: 12%;">Vrijednost EUR</th>' +
+                    '</tr></thead><tbody>' + artikliRows + '</tbody></table>' +
+                    '<div class="totals">' +
+                    '<div class="total-row"><span>Ukupno:</span><span>' + ukupnoBezPDV.toFixed(2) + '</span></div>' +
+                    '<div class="total-row"><span>PDV 25,00% od ' + ukupnoBezPDV.toFixed(2) + ':</span><span>' + pdv.toFixed(2) + '</span></div>' +
+                    '<div class="total-row final"><span>Ukupno EUR:</span><span>' + ukupnoSaPDV.toFixed(2) + '</span></div>' +
+                    '</div>' +
+                    '<div class="footer"><p>Odgovorna osoba: Tihomir Borovčak</p></div>' +
+                    '<div class="signatures">' +
+                    '<div class="signature-box"><div>Operater:</div><div class="signature-line">_______________________</div></div>' +
+                    '<div class="signature-box"><div>Preuzeo:</div><div class="signature-line">_______________________</div></div>' +
+                    '</div>' +
+                    '<div class="footer-note">Dokument je pravovaljan bez pečata i potpisa jer je ispisan elektroničkim putem.</div>' +
+                    '<div class="contact-footer">TEL: 049/500-005, E-MAIL: info@signalprint.hr, WEB: www.signalprint.hr, FB: signal.print.zabok, IG: signalprint_zabok</div>' +
+                    '</body></html>'
+                );
+                printWindow.document.close();
+                printWindow.print();
+            };
+
             // Filtriraj samo završene naloge koji imaju broj računa
             const zavrseniNalozi = radniNalozi.filter(nalog => 
                 nalog.status === 'zavrsen' && nalog.brojRacuna && nalog.brojRacuna.trim() !== ''
@@ -5289,6 +5394,19 @@
                                                 <td className="px-3 py-2 text-right">{getUkupnaCijena(nalog).toFixed(2)} EUR</td>
                                                 <td className="px-3 py-2 text-right">
                                                     <button
+                                                        onClick={async () => {
+                                                            let fullNalog = nalog;
+                                                            if (!nalog.artikli || nalog.artikli.length === 0) {
+                                                                fullNalog = await apiCall('nalozi/' + nalog.id, 'GET', null, userId);
+                                                            }
+                                                            printOtpremnica(fullNalog);
+                                                        }}
+                                                        className="text-blue-600 hover:text-blue-900 mr-2"
+                                                        title="Print otpremnica"
+                                                    >
+                                                        🖨️
+                                                    </button>
+                                                    <button
                                                         onClick={() => handleView(nalog)}
                                                         className="text-green-600 hover:text-green-900 mr-2"
                                                     >
@@ -5369,6 +5487,129 @@
             );
         }
 
+        // TaskoviSekcija komponenta - Opći podsjetnici (kompaktna verzija)
+        function TaskoviSekcija({ userId }) {
+            const [taskovi, setTaskovi] = useState([]);
+            const [noviTask, setNoviTask] = useState('');
+            const [showInput, setShowInput] = useState(false);
+            const [editingTaskId, setEditingTaskId] = useState(null);
+            const [editingText, setEditingText] = useState('');
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const loadTaskovi = async () => {
+                    try {
+                        const data = await apiCall('taskovi', 'GET', null, userId);
+                        setTaskovi(data || []);
+                    } catch (error) {
+                        console.error('Greška pri učitavanju taskova:', error);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                loadTaskovi();
+            }, [userId]);
+
+            const handleAddTask = async () => {
+                if (!noviTask.trim()) return;
+                try {
+                    const result = await apiCall('taskovi', 'POST', { tekst: noviTask.trim() }, userId);
+                    if (result.success) {
+                        setTaskovi([{ id: result.id, tekst: result.tekst, kreiraoIme: result.kreiraoIme, createdAt: result.createdAt }, ...taskovi]);
+                        setNoviTask('');
+                        setShowInput(false);
+                    }
+                } catch (error) {
+                    alert('Greška: ' + error.message);
+                }
+            };
+
+            const handleFinishTask = async (id) => {
+                try {
+                    await apiCall('taskovi/' + id, 'DELETE', null, userId);
+                    setTaskovi(taskovi.filter(t => t.id !== id));
+                } catch (error) {
+                    alert('Greška: ' + error.message);
+                }
+            };
+
+            const handleEditTask = async (id) => {
+                if (!editingText.trim()) return;
+                try {
+                    await apiCall('taskovi/' + id, 'PUT', { tekst: editingText.trim() }, userId);
+                    setTaskovi(taskovi.map(t => t.id === id ? { ...t, tekst: editingText.trim() } : t));
+                    setEditingTaskId(null);
+                    setEditingText('');
+                } catch (error) {
+                    alert('Greška: ' + error.message);
+                }
+            };
+
+            if (loading) return null;
+            if (taskovi.length === 0 && !showInput) {
+                return (
+                    <div className="mb-2 flex items-center gap-2">
+                        <button onClick={() => setShowInput(true)} className="text-xs text-primary-600 hover:text-primary-800">
+                            📌 + Dodaj opći podsjetnik
+                        </button>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="mb-3 px-2 py-1 bg-yellow-50 border-l-4 border-yellow-400 rounded text-xs">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-yellow-800">📌 Opći podsjetnici ({taskovi.length})</span>
+                        <button onClick={() => setShowInput(!showInput)} className="text-yellow-600 hover:text-yellow-800 text-xs">
+                            {showInput ? '✕' : '+'}
+                        </button>
+                    </div>
+                    
+                    {showInput && (
+                        <div className="flex items-center gap-1 mb-1">
+                            <input
+                                type="text"
+                                value={noviTask}
+                                onChange={(e) => setNoviTask(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleAddTask()}
+                                placeholder="Novi podsjetnik..."
+                                className="flex-1 border rounded px-2 py-0.5 text-xs"
+                                autoFocus
+                            />
+                            <button onClick={handleAddTask} disabled={!noviTask.trim()} className="text-green-600 hover:text-green-800 disabled:opacity-50">✓</button>
+                            <button onClick={() => { setShowInput(false); setNoviTask(''); }} className="text-gray-500 hover:text-gray-700">✕</button>
+                        </div>
+                    )}
+
+                    {taskovi.map(task => (
+                        <div key={task.id} className="flex items-center gap-1 py-0.5">
+                            {editingTaskId === task.id ? (
+                                <>
+                                    <input
+                                        type="text"
+                                        value={editingText}
+                                        onChange={(e) => setEditingText(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleEditTask(task.id)}
+                                        className="flex-1 border rounded px-1 py-0.5 text-xs"
+                                        autoFocus
+                                    />
+                                    <button onClick={() => handleEditTask(task.id)} className="text-green-600">Spremi</button>
+                                    <button onClick={() => { setEditingTaskId(null); setEditingText(''); }} className="text-gray-500">Odustani</button>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-yellow-800">{task.tekst}</span>
+                                    <span className="text-gray-400">({task.kreiraoIme}, {new Date(task.createdAt).toLocaleString('hr-HR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})})</span>
+                                    <button onClick={() => { setEditingTaskId(task.id); setEditingText(task.tekst); }} className="text-blue-500 hover:text-blue-700">Uredi</button>
+                                    <button onClick={() => handleFinishTask(task.id)} className="text-green-500 hover:text-green-700">Završi</button>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
         function RadniNaloziTab({ radniNalozi, setRadniNalozi, kupci, artikli, postupci, materijali, setMaterijali, userId, isAdmin }) {
             const [showForm, setShowForm] = useState(false);
             const [editingId, setEditingId] = useState(null);
@@ -5400,6 +5641,111 @@
                 artikli: [],
                 postupci: []
             });
+
+            // Print otpremnica/predračun
+            const printOtpremnica = (nalog) => {
+                const ukupnoBezPDV = (nalog.artikli || []).reduce((sum, a) => sum + (parseFloat(a.cijena || 0) * parseFloat(a.kolicina || 0)), 0);
+                const pdv = ukupnoBezPDV * 0.25;
+                const ukupnoSaPDV = ukupnoBezPDV + pdv;
+                
+                let artikliRows = '';
+                (nalog.artikli || []).forEach(art => {
+                    const cijenaBezPDV = parseFloat(art.cijena) || 0;
+                    const kol = parseFloat(art.kolicina) || 0;
+                    const pdvIznos = cijenaBezPDV * 0.25;
+                    const cijenaSaPDV = cijenaBezPDV + pdvIznos;
+                    const vrijednost = cijenaSaPDV * kol;
+                    const napomena = [art.format, art.opis].filter(Boolean).join(' - ');
+                    
+                    artikliRows += '<tr><td>' + 
+                        (art.sifra ? '<span style="color:#666;">(' + art.sifra + ')</span> ' : '') +
+                        '<strong>' + (art.naziv || '') + '</strong>' + 
+                        (art.kpdSifra ? '<div style="font-size:8px;color:#888;">KPD: ' + art.kpdSifra + '</div>' : '') +
+                        (napomena ? '<div class="napomena">' + napomena + '</div>' : '') +
+                        '</td><td class="right">' + kol.toFixed(2) + ' ' + (art.jedinica || 'kom') + 
+                        '</td><td class="right">' + cijenaBezPDV.toFixed(2) + 
+                        '</td><td class="right">' + pdvIznos.toFixed(2) + ' (25%)' +
+                        '</td><td class="right">' + cijenaSaPDV.toFixed(2) + 
+                        '</td><td class="right">' + vrijednost.toFixed(2) + '</td></tr>';
+                });
+                
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(
+                    '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Otpremnica ' + nalog.broj + '</title>' +
+                    '<style>' +
+                    '* { margin: 0; padding: 0; box-sizing: border-box; }' +
+                    'body { font-family: Arial, sans-serif; font-size: 11px; padding: 15mm; color: #333; }' +
+                    '.header { display: flex; justify-content: space-between; margin-bottom: 20px; }' +
+                    '.logo { font-size: 24px; font-weight: bold; }' +
+                    '.logo-sub { font-size: 10px; color: #666; }' +
+                    '.company-info { font-size: 9px; line-height: 1.4; }' +
+                    '.document-title { font-size: 22px; font-weight: bold; text-align: center; margin: 20px 0 10px 0; }' +
+                    '.client-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; min-height: 80px; }' +
+                    '.client-name { font-weight: bold; font-size: 13px; margin-bottom: 5px; }' +
+                    '.doc-info { margin-bottom: 15px; }' +
+                    '.doc-info-row { display: flex; margin-bottom: 3px; }' +
+                    '.doc-info-label { width: 100px; font-weight: bold; }' +
+                    'table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }' +
+                    'th { background: #f5f5f5; border: 1px solid #ccc; padding: 8px 5px; text-align: left; font-size: 10px; font-weight: bold; }' +
+                    'td { border: 1px solid #ccc; padding: 6px 5px; vertical-align: top; }' +
+                    '.right { text-align: right; }' +
+                    '.napomena { font-size: 9px; color: #555; font-style: italic; margin-top: 3px; }' +
+                    '.totals { margin-left: auto; width: 250px; }' +
+                    '.total-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; }' +
+                    '.total-row.final { font-weight: bold; font-size: 14px; border-bottom: 2px solid #333; border-top: 2px solid #333; padding: 8px 0; }' +
+                    '.footer { margin-top: 30px; font-size: 9px; }' +
+                    '.signatures { display: flex; justify-content: space-between; margin-top: 40px; }' +
+                    '.signature-box { width: 200px; text-align: center; }' +
+                    '.signature-line { border-top: 1px solid #333; margin-top: 40px; padding-top: 5px; }' +
+                    '.footer-note { font-size: 8px; color: #666; text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; }' +
+                    '.contact-footer { text-align: center; font-size: 8px; color: #666; margin-top: 10px; }' +
+                    '@media print { body { padding: 10mm; } @page { margin: 10mm; } }' +
+                    '</style></head><body>' +
+                    '<div class="header"><div>' +
+                    '<div class="logo">SIGNALprint</div>' +
+                    '<div class="logo-sub">trgovina, usluge, proizvodnja</div>' +
+                    '<div class="company-info" style="margin-top: 5px;">vl. Tihomir Borovčak<br>Naselje Borovčaki 8<br>HR-49210 Zabok<br><br>OIB 52276562396<br><br>IBAN ZABA: HR8923600001101163526<br>IBAN PBZ: HR7723400091160234176</div>' +
+                    '</div><div style="text-align: right;"><div class="client-box">' +
+                    '<div class="client-name">' + (nalog.klijentNaziv || '') + '</div>' +
+                    (nalog.kontaktOsoba ? '<div>' + nalog.kontaktOsoba + '</div>' : '') +
+                    (nalog.telefon ? '<div>Tel: ' + nalog.telefon + '</div>' : '') +
+                    (nalog.email ? '<div>' + nalog.email + '</div>' : '') +
+                    '</div></div></div>' +
+                    '<div class="document-title">OTPREMNICA - PREDRAČUN</div>' +
+                    '<div style="display: flex; justify-content: space-between;"><div class="doc-info">' +
+                    '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + nalog.broj + '</span></div>' +
+                    '<div class="doc-info-row"><span class="doc-info-label">Mjesto:</span> <span>Zabok</span></div>' +
+                    '<div class="doc-info-row"><span class="doc-info-label">Datum:</span> <span>' + new Date(nalog.datum).toLocaleDateString('hr-HR') + '</span></div>' +
+                    (nalog.rokIzrade ? '<div class="doc-info-row"><span class="doc-info-label">Rok izrade:</span> <span>' + new Date(nalog.rokIzrade).toLocaleDateString('hr-HR') + '</span></div>' : '') +
+                    '</div><div class="doc-info">' +
+                    (nalog.brojRacuna ? '<div class="doc-info-row"><span class="doc-info-label">Broj računa:</span> <span>' + nalog.brojRacuna + '</span></div>' : '') +
+                    '<div class="doc-info-row"><span class="doc-info-label">Naziv:</span> <span>' + (nalog.nazivNaloga || '') + '</span></div>' +
+                    '</div></div>' +
+                    '<table><thead><tr>' +
+                    '<th style="width: 40%;">Vrsta robe odnosno usluga</th>' +
+                    '<th class="right" style="width: 12%;">Količina</th>' +
+                    '<th class="right" style="width: 12%;">Cijena</th>' +
+                    '<th class="right" style="width: 12%;">PDV</th>' +
+                    '<th class="right" style="width: 12%;">Cijena + PDV</th>' +
+                    '<th class="right" style="width: 12%;">Vrijednost EUR</th>' +
+                    '</tr></thead><tbody>' + artikliRows + '</tbody></table>' +
+                    '<div class="totals">' +
+                    '<div class="total-row"><span>Ukupno:</span><span>' + ukupnoBezPDV.toFixed(2) + '</span></div>' +
+                    '<div class="total-row"><span>PDV 25,00% od ' + ukupnoBezPDV.toFixed(2) + ':</span><span>' + pdv.toFixed(2) + '</span></div>' +
+                    '<div class="total-row final"><span>Ukupno EUR:</span><span>' + ukupnoSaPDV.toFixed(2) + '</span></div>' +
+                    '</div>' +
+                    '<div class="footer"><p>Odgovorna osoba: Tihomir Borovčak</p></div>' +
+                    '<div class="signatures">' +
+                    '<div class="signature-box"><div>Operater:</div><div class="signature-line">_______________________</div></div>' +
+                    '<div class="signature-box"><div>Preuzeo:</div><div class="signature-line">_______________________</div></div>' +
+                    '</div>' +
+                    '<div class="footer-note">Dokument je pravovaljan bez pečata i potpisa jer je ispisan elektroničkim putem.</div>' +
+                    '<div class="contact-footer">TEL: 049/500-005, E-MAIL: info@signalprint.hr, WEB: www.signalprint.hr, FB: signal.print.zabok, IG: signalprint_zabok</div>' +
+                    '</body></html>'
+                );
+                printWindow.document.close();
+                printWindow.print();
+            };
 
             // Otvori modal za rasknjiženje
             const openRasknjizenjeModal = async (nalog) => {
@@ -6664,6 +7010,9 @@
                         </div>
                     )}
 
+                    {/* TASKOVI - Opći podsjetnici */}
+                    <TaskoviSekcija userId={userId} />
+
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
@@ -6912,6 +7261,19 @@
                                                 </td>
                                                 <td className="px-3 py-2 text-right">{getUkupnaCijena(nalog).toFixed(2)} EUR</td>
                                                 <td className="px-3 py-2 text-right">
+                                                <button
+                                                    onClick={async () => {
+                                                        let fullNalog = nalog;
+                                                        if (!nalog.artikli || nalog.artikli.length === 0) {
+                                                            fullNalog = await apiCall('nalozi/' + nalog.id, 'GET', null, userId);
+                                                        }
+                                                        printOtpremnica(fullNalog);
+                                                    }}
+                                                    className="text-blue-600 hover:text-blue-900 mr-2"
+                                                    title="Print otpremnica"
+                                                >
+                                                    🖨️
+                                                </button>
                                                 <button
                                                     onClick={() => handleView(nalog)}
                                                     className="text-green-600 hover:text-green-900 mr-2"

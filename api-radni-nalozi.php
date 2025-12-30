@@ -859,7 +859,7 @@ if ($endpoint === 'nalozi') {
         
         // Dohvati artikle
         $stmtArtikli = $db->prepare("
-            SELECT na.*, a.naziv as artikl_naziv 
+            SELECT na.*, a.naziv as artikl_naziv, a.sifra as artikl_sifra, a.kpd_sifra as artikl_kpd_sifra 
             FROM nalog_artikli na
             LEFT JOIN artikli a ON a.id = na.artikl_id
             WHERE na.nalog_id = ?
@@ -985,6 +985,8 @@ if ($endpoint === 'nalozi') {
                 return [
                     'id' => (string)$a['id'],
                     'artiklId' => (string)$a['artikl_id'],
+                    'sifra' => $a['artikl_sifra'] ?? '',
+                    'kpdSifra' => $a['artikl_kpd_sifra'] ?? '',
                     'naziv' => $a['naziv'] ?: $a['artikl_naziv'],
                     'kolicina' => (string)$a['kolicina'],
                     'jedinica' => $a['jedinica'] ?? 'kom',
@@ -2843,6 +2845,84 @@ if ($endpoint === 'kpd-podrucja') {
     if ($method === 'GET') {
         $stmt = $db->query("SELECT * FROM kpd_2025_podrucja ORDER BY podrucje");
         sendResponse($stmt->fetchAll());
+    }
+}
+
+// ============================================
+// TASKOVI - Opći podsjetnici
+// ============================================
+if ($endpoint === 'taskovi') {
+    
+    // GET - dohvati sve aktivne taskove (nezavršene)
+    if ($method === 'GET' && !$id) {
+        $stmt = $db->query("
+            SELECT t.*, k.ime as kreirao_ime, k.prezime as kreirao_prezime
+            FROM taskovi t
+            LEFT JOIN korisnici k ON k.id = t.created_by
+            WHERE t.zavrsen = 0
+            ORDER BY t.created_at DESC
+        ");
+        $taskovi = $stmt->fetchAll();
+        
+        $result = array_map(function($t) {
+            return [
+                'id' => (int)$t['id'],
+                'tekst' => $t['tekst'],
+                'kreiraoIme' => trim(($t['kreirao_ime'] ?? '') . ' ' . ($t['kreirao_prezime'] ?? '')),
+                'createdAt' => $t['created_at']
+            ];
+        }, $taskovi);
+        
+        sendResponse($result);
+    }
+    
+    // POST - novi task
+    if ($method === 'POST') {
+        if (!$userId) sendError('Unauthorized', 401);
+        
+        $tekst = trim($input['tekst'] ?? '');
+        if (empty($tekst)) sendError('Tekst je obavezan', 400);
+        
+        $stmt = $db->prepare("INSERT INTO taskovi (tekst, created_by) VALUES (?, ?)");
+        $stmt->execute([$tekst, $userId]);
+        
+        $newId = $db->lastInsertId();
+        
+        // Dohvati ime kreatora
+        $stmtUser = $db->prepare("SELECT ime, prezime FROM korisnici WHERE id = ?");
+        $stmtUser->execute([$userId]);
+        $user = $stmtUser->fetch();
+        
+        sendResponse([
+            'success' => true,
+            'id' => (int)$newId,
+            'tekst' => $tekst,
+            'kreiraoIme' => trim(($user['ime'] ?? '') . ' ' . ($user['prezime'] ?? '')),
+            'createdAt' => date('Y-m-d H:i:s')
+        ]);
+    }
+    
+    // PUT - uredi task
+    if ($method === 'PUT' && $id) {
+        if (!$userId) sendError('Unauthorized', 401);
+        
+        $tekst = trim($input['tekst'] ?? '');
+        if (empty($tekst)) sendError('Tekst je obavezan', 400);
+        
+        $stmt = $db->prepare("UPDATE taskovi SET tekst = ? WHERE id = ?");
+        $stmt->execute([$tekst, $id]);
+        
+        sendResponse(['success' => true]);
+    }
+    
+    // DELETE - označi kao završen (soft delete)
+    if ($method === 'DELETE' && $id) {
+        if (!$userId) sendError('Unauthorized', 401);
+        
+        $stmt = $db->prepare("UPDATE taskovi SET zavrsen = 1, zavrsen_by = ?, zavrsen_at = NOW() WHERE id = ?");
+        $stmt->execute([$userId, $id]);
+        
+        sendResponse(['success' => true]);
     }
 }
 
