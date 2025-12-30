@@ -1017,7 +1017,10 @@
                 { id: 'postupci', naziv: 'Postupci', icon: '⚙️' },
                 { id: 'materijali', naziv: 'Materijali', icon: '🧱' },
                 { id: 'izvjestaji', naziv: 'Izvještaji', icon: '📊' },
-                ...(currentUser?.uloga === 'admin' ? [{ id: 'korisnici', naziv: 'Korisnici', icon: '🔐' }] : [])
+                ...(currentUser?.uloga === 'admin' ? [
+                    { id: 'podsjetnici', naziv: 'Podsjetnici', icon: '📌' },
+                    { id: 'korisnici', naziv: 'Korisnici', icon: '🔐' }
+                ] : [])
             ];
 
             const handleLogout = () => {
