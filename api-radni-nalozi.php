@@ -2876,6 +2876,34 @@ if ($endpoint === 'taskovi') {
         sendResponse($result);
     }
     
+    // GET zavrseni - dohvati završene taskove (samo za admina)
+    if ($method === 'GET' && $id === 'zavrseni') {
+        $stmt = $db->query("
+            SELECT t.*, 
+                   k1.ime as kreirao_ime, k1.prezime as kreirao_prezime,
+                   k2.ime as zavrsio_ime, k2.prezime as zavrsio_prezime
+            FROM taskovi t
+            LEFT JOIN korisnici k1 ON k1.id = t.created_by
+            LEFT JOIN korisnici k2 ON k2.id = t.zavrsen_by
+            WHERE t.zavrsen = 1
+            ORDER BY t.zavrsen_at DESC
+        ");
+        $taskovi = $stmt->fetchAll();
+        
+        $result = array_map(function($t) {
+            return [
+                'id' => (int)$t['id'],
+                'tekst' => $t['tekst'],
+                'kreiraoIme' => trim(($t['kreirao_ime'] ?? '') . ' ' . ($t['kreirao_prezime'] ?? '')),
+                'createdAt' => $t['created_at'],
+                'zavrsioIme' => trim(($t['zavrsio_ime'] ?? '') . ' ' . ($t['zavrsio_prezime'] ?? '')),
+                'zavrsenAt' => $t['zavrsen_at']
+            ];
+        }, $taskovi);
+        
+        sendResponse($result);
+    }
+    
     // POST - novi task
     if ($method === 'POST') {
         if (!$userId) sendError('Unauthorized', 401);
@@ -2903,7 +2931,7 @@ if ($endpoint === 'taskovi') {
     }
     
     // PUT - uredi task
-    if ($method === 'PUT' && $id) {
+    if ($method === 'PUT' && $id && $id !== 'zavrseni') {
         if (!$userId) sendError('Unauthorized', 401);
         
         $tekst = trim($input['tekst'] ?? '');
@@ -2915,12 +2943,20 @@ if ($endpoint === 'taskovi') {
         sendResponse(['success' => true]);
     }
     
-    // DELETE - označi kao završen (soft delete)
-    if ($method === 'DELETE' && $id) {
+    // DELETE - označi kao završen ili trajno obriši
+    if ($method === 'DELETE' && $id && $id !== 'zavrseni') {
         if (!$userId) sendError('Unauthorized', 401);
         
-        $stmt = $db->prepare("UPDATE taskovi SET zavrsen = 1, zavrsen_by = ?, zavrsen_at = NOW() WHERE id = ?");
-        $stmt->execute([$userId, $id]);
+        // Provjeri da li je trajno brisanje (admin briše završeni task)
+        $permanent = isset($_GET['permanent']) && $_GET['permanent'] === '1';
+        
+        if ($permanent) {
+            $stmt = $db->prepare("DELETE FROM taskovi WHERE id = ?");
+            $stmt->execute([$id]);
+        } else {
+            $stmt = $db->prepare("UPDATE taskovi SET zavrsen = 1, zavrsen_by = ?, zavrsen_at = NOW() WHERE id = ?");
+            $stmt->execute([$userId, $id]);
+        }
         
         sendResponse(['success' => true]);
     }

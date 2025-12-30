@@ -5488,8 +5488,10 @@
         }
 
         // TaskoviSekcija komponenta - Opći podsjetnici (kompaktna verzija)
-        function TaskoviSekcija({ userId }) {
+        function TaskoviSekcija({ userId, isAdmin }) {
             const [taskovi, setTaskovi] = useState([]);
+            const [zavrseniTaskovi, setZavrseniTaskovi] = useState([]);
+            const [showZavrsene, setShowZavrsene] = useState(false);
             const [noviTask, setNoviTask] = useState('');
             const [showInput, setShowInput] = useState(false);
             const [editingTaskId, setEditingTaskId] = useState(null);
@@ -5501,6 +5503,10 @@
                     try {
                         const data = await apiCall('taskovi', 'GET', null, userId);
                         setTaskovi(data || []);
+                        if (isAdmin) {
+                            const zavrseni = await apiCall('taskovi/zavrseni', 'GET', null, userId);
+                            setZavrseniTaskovi(zavrseni || []);
+                        }
                     } catch (error) {
                         console.error('Greška pri učitavanju taskova:', error);
                     } finally {
@@ -5508,7 +5514,7 @@
                     }
                 };
                 loadTaskovi();
-            }, [userId]);
+            }, [userId, isAdmin]);
 
             const handleAddTask = async () => {
                 if (!noviTask.trim()) return;
@@ -5527,7 +5533,21 @@
             const handleFinishTask = async (id) => {
                 try {
                     await apiCall('taskovi/' + id, 'DELETE', null, userId);
+                    const task = taskovi.find(t => t.id === id);
                     setTaskovi(taskovi.filter(t => t.id !== id));
+                    if (isAdmin && task) {
+                        setZavrseniTaskovi([{ ...task, zavrsioIme: 'Ti', zavrsenAt: new Date().toISOString() }, ...zavrseniTaskovi]);
+                    }
+                } catch (error) {
+                    alert('Greška: ' + error.message);
+                }
+            };
+
+            const handleDeletePermanent = async (id) => {
+                if (!confirm('Trajno obrisati ovaj task?')) return;
+                try {
+                    await apiCall('taskovi/' + id + '?permanent=1', 'DELETE', null, userId);
+                    setZavrseniTaskovi(zavrseniTaskovi.filter(t => t.id !== id));
                 } catch (error) {
                     alert('Greška: ' + error.message);
                 }
@@ -5546,7 +5566,7 @@
             };
 
             if (loading) return null;
-            if (taskovi.length === 0 && !showInput) {
+            if (taskovi.length === 0 && zavrseniTaskovi.length === 0 && !showInput) {
                 return (
                     <div className="mb-2 flex items-center gap-2">
                         <button onClick={() => setShowInput(true)} className="text-xs text-primary-600 hover:text-primary-800">
@@ -5563,6 +5583,11 @@
                         <button onClick={() => setShowInput(!showInput)} className="text-yellow-600 hover:text-yellow-800 text-xs">
                             {showInput ? '✕' : '+'}
                         </button>
+                        {isAdmin && zavrseniTaskovi.length > 0 && (
+                            <button onClick={() => setShowZavrsene(!showZavrsene)} className="text-gray-500 hover:text-gray-700 text-xs ml-auto">
+                                {showZavrsene ? 'Sakrij završene' : 'Prikaži završene (' + zavrseniTaskovi.length + ')'}
+                            </button>
+                        )}
                     </div>
                     
                     {showInput && (
@@ -5576,8 +5601,8 @@
                                 className="flex-1 border rounded px-2 py-0.5 text-xs"
                                 autoFocus
                             />
-                            <button onClick={handleAddTask} disabled={!noviTask.trim()} className="text-green-600 hover:text-green-800 disabled:opacity-50">✓</button>
-                            <button onClick={() => { setShowInput(false); setNoviTask(''); }} className="text-gray-500 hover:text-gray-700">✕</button>
+                            <button onClick={handleAddTask} disabled={!noviTask.trim()} className="text-green-600 hover:text-green-800 disabled:opacity-50">Dodaj</button>
+                            <button onClick={() => { setShowInput(false); setNoviTask(''); }} className="text-gray-500 hover:text-gray-700">Odustani</button>
                         </div>
                     )}
 
@@ -5606,6 +5631,20 @@
                             )}
                         </div>
                     ))}
+
+                    {/* Završeni taskovi - samo admin */}
+                    {isAdmin && showZavrsene && zavrseniTaskovi.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-yellow-300">
+                            <div className="text-gray-500 font-semibold mb-1">✓ Završeni:</div>
+                            {zavrseniTaskovi.map(task => (
+                                <div key={task.id} className="flex items-center gap-1 py-0.5 text-gray-400 line-through">
+                                    <span>{task.tekst}</span>
+                                    <span className="no-underline">({task.zavrsioIme}, {new Date(task.zavrsenAt).toLocaleString('hr-HR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})})</span>
+                                    <button onClick={() => handleDeletePermanent(task.id)} className="text-red-400 hover:text-red-600 no-underline">Obriši</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -7011,7 +7050,7 @@
                     )}
 
                     {/* TASKOVI - Opći podsjetnici */}
-                    <TaskoviSekcija userId={userId} />
+                    <TaskoviSekcija userId={userId} isAdmin={isAdmin} />
 
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
