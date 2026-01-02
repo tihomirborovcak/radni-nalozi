@@ -742,12 +742,14 @@ if ($endpoint === 'nalozi') {
                    COALESCE(SUM(na.kolicina * na.cijena), 0) as ukupna_vrijednost,
                    kc.ime as kreirao_ime,
                    ku.ime as azurirao_ime,
-                   ko.ime as obrisao_ime
+                   ko.ime as obrisao_ime,
+                   koi.ime as otpremnica_izdao_ime
             FROM nalozi n
             LEFT JOIN nalog_artikli na ON na.nalog_id = n.id
             LEFT JOIN korisnici kc ON kc.id = n.created_by
             LEFT JOIN korisnici ku ON ku.id = n.updated_by
             LEFT JOIN korisnici ko ON ko.id = n.obrisan_by
+            LEFT JOIN korisnici koi ON koi.id = n.otpremnica_izdao
             $whereClause
             GROUP BY n.id
             ORDER BY n.datum DESC, n.id DESC
@@ -835,6 +837,10 @@ if ($endpoint === 'nalozi') {
                 'obrisanAt' => $n['obrisan_at'] ?? null,
                 'obrisanBy' => $n['obrisan_by'] ? (string)$n['obrisan_by'] : null,
                 'obrisaoIme' => $n['obrisao_ime'] ?? null,
+                'otpremnicaIzdana' => (bool)($n['otpremnica_izdana'] ?? false),
+                'otpremnicaDatum' => $n['otpremnica_datum'] ?? null,
+                'otpremnicaIzdao' => $n['otpremnica_izdao'] ?? null,
+                'otpremnicaIzdaoIme' => $n['otpremnica_izdao_ime'] ?? null,
                 'createdAt' => $n['created_at'],
                 'createdBy' => (string)$n['created_by'],
                 'createdByName' => $n['kreirao_ime'],
@@ -2959,6 +2965,38 @@ if ($endpoint === 'taskovi') {
         }
         
         sendResponse(['success' => true]);
+    }
+}
+
+// ============================================
+// OTPREMNICA - Označi izdanu otpremnicu
+// ============================================
+if ($endpoint === 'otpremnica') {
+    
+    // POST - označi otpremnicu izdanom
+    if ($method === 'POST' && $id) {
+        if (!$userId) sendError('Unauthorized', 401);
+        
+        $stmt = $db->prepare("
+            UPDATE nalozi 
+            SET otpremnica_izdana = 1, 
+                otpremnica_datum = NOW(), 
+                otpremnica_izdao = ? 
+            WHERE id = ?
+        ");
+        $stmt->execute([$userId, $id]);
+        
+        // Dohvati ime operatera
+        $stmtUser = $db->prepare("SELECT ime, prezime FROM korisnici WHERE id = ?");
+        $stmtUser->execute([$userId]);
+        $user = $stmtUser->fetch();
+        
+        sendResponse([
+            'success' => true,
+            'otpremnicaIzdana' => true,
+            'otpremnicaDatum' => date('Y-m-d H:i:s'),
+            'otpremnicaIzdaoIme' => trim(($user['ime'] ?? '') . ' ' . ($user['prezime'] ?? ''))
+        ]);
     }
 }
 

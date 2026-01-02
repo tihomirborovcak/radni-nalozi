@@ -4630,8 +4630,7 @@
                     '<div style="display: flex; justify-content: space-between;"><div class="doc-info">' +
                     '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + nalog.broj + '</span></div>' +
                     '<div class="doc-info-row"><span class="doc-info-label">Mjesto:</span> <span>Zabok</span></div>' +
-                    '<div class="doc-info-row"><span class="doc-info-label">Datum:</span> <span>' + new Date(nalog.datum).toLocaleDateString('hr-HR') + '</span></div>' +
-                    (nalog.rokIzrade ? '<div class="doc-info-row"><span class="doc-info-label">Rok izrade:</span> <span>' + new Date(nalog.rokIzrade).toLocaleDateString('hr-HR') + '</span></div>' : '') +
+                    '<div class="doc-info-row"><span class="doc-info-label">Datum:</span> <span>' + new Date().toLocaleDateString('hr-HR') + '</span></div>' +
                     '</div><div class="doc-info">' +
                     (nalog.brojRacuna ? '<div class="doc-info-row"><span class="doc-info-label">Broj računa:</span> <span>' + nalog.brojRacuna + '</span></div>' : '') +
                     '<div class="doc-info-row"><span class="doc-info-label">Naziv:</span> <span>' + (nalog.nazivNaloga || '') + '</span></div>' +
@@ -5792,6 +5791,25 @@
                 printWindow.print();
             };
 
+            // Označi otpremnicu izdanom
+            const markOtpremnicaIzdana = async (nalogId) => {
+                try {
+                    const result = await apiCall('otpremnica/' + nalogId, 'POST', {}, userId);
+                    if (result.success) {
+                        setRadniNalozi(prev => prev.map(n => 
+                            n.id === nalogId ? {
+                                ...n,
+                                otpremnicaIzdana: true,
+                                otpremnicaDatum: result.otpremnicaDatum,
+                                otpremnicaIzdaoIme: result.otpremnicaIzdaoIme
+                            } : n
+                        ));
+                    }
+                } catch (error) {
+                    alert('Greška: ' + error.message);
+                }
+            };
+
             // Print OTPREMNICA - za završene naloge (samo artikli i cijene)
             const printOtpremnica = (nalog) => {
                 const ukupnoBezPDV = (nalog.artikli || []).reduce((sum, a) => sum + (parseFloat(a.cijena || 0) * parseFloat(a.kolicina || 0)), 0);
@@ -5865,8 +5883,7 @@
                     '<div style="display: flex; justify-content: space-between;"><div class="doc-info">' +
                     '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + nalog.broj + '</span></div>' +
                     '<div class="doc-info-row"><span class="doc-info-label">Mjesto:</span> <span>Zabok</span></div>' +
-                    '<div class="doc-info-row"><span class="doc-info-label">Datum:</span> <span>' + new Date(nalog.datum).toLocaleDateString('hr-HR') + '</span></div>' +
-                    (nalog.rokIzrade ? '<div class="doc-info-row"><span class="doc-info-label">Rok izrade:</span> <span>' + new Date(nalog.rokIzrade).toLocaleDateString('hr-HR') + '</span></div>' : '') +
+                    '<div class="doc-info-row"><span class="doc-info-label">Datum:</span> <span>' + new Date().toLocaleDateString('hr-HR') + '</span></div>' +
                     '</div><div class="doc-info">' +
                     (nalog.brojRacuna ? '<div class="doc-info-row"><span class="doc-info-label">Broj računa:</span> <span>' + nalog.brojRacuna + '</span></div>' : '') +
                     '<div class="doc-info-row"><span class="doc-info-label">Naziv:</span> <span>' + (nalog.nazivNaloga || '') + '</span></div>' +
@@ -7424,6 +7441,19 @@
                                                 </td>
                                                 <td className="px-3 py-2 text-right">{getUkupnaCijena(nalog).toFixed(2)} EUR</td>
                                                 <td className="px-3 py-2 text-right">
+                                                {nalog.otpremnicaIzdana ? (
+                                                    <span className="text-green-600 text-xs mr-2">
+                                                        ✓ Otpremnica ({nalog.otpremnicaIzdaoIme}, {new Date(nalog.otpremnicaDatum).toLocaleString('hr-HR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})})
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => markOtpremnicaIzdana(nalog.id)}
+                                                        className="text-orange-600 hover:text-orange-800 mr-2 text-xs"
+                                                        title="Označi otpremnicu izdanom"
+                                                    >
+                                                        📋 Izdaj
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={async () => {
                                                         let fullNalog = nalog;
