@@ -5752,7 +5752,7 @@
                     (nalog.telefon ? '<div>Tel: ' + nalog.telefon + '</div>' : '') +
                     (nalog.email ? '<div>' + nalog.email + '</div>' : '') +
                     '</div></div></div>' +
-                    '<div class="document-title">OTPREMNICA - PREDRAČUN</div>' +
+                    '<div class="document-title">OTPREMNICA</div>' +
                     '<div style="display: flex; justify-content: space-between;"><div class="doc-info">' +
                     '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + nalog.broj + '</span></div>' +
                     '<div class="doc-info-row"><span class="doc-info-label">Mjesto:</span> <span>Zabok</span></div>' +
@@ -7167,6 +7167,19 @@
                                                 </td>
                                                 <td className="px-3 py-2 text-right">{getUkupnaCijena(nalog).toFixed(2)} EUR</td>
                                                 <td className="px-3 py-2 text-right whitespace-nowrap">
+                                                <button
+                                                    onClick={async () => {
+                                                        let fullNalog = nalog;
+                                                        if (!nalog.artikli || nalog.artikli.length === 0) {
+                                                            fullNalog = await apiCall('nalozi/' + nalog.id, 'GET', null, userId);
+                                                        }
+                                                        printOtpremnica(fullNalog);
+                                                    }}
+                                                    className="text-blue-600 hover:text-blue-900 mr-2"
+                                                    title="Print otpremnica"
+                                                >
+                                                    🖨️
+                                                </button>
                                                 <button
                                                     onClick={() => handleView(nalog)}
                                                     className="text-green-600 hover:text-green-900 mr-2"
