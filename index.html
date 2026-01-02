@@ -5810,6 +5810,26 @@
                 }
             };
 
+            // Poništi otpremnicu (samo admin)
+            const cancelOtpremnica = async (nalogId) => {
+                if (!confirm('Poništiti izdanu otpremnicu?')) return;
+                try {
+                    const result = await apiCall('otpremnica/' + nalogId, 'DELETE', {}, userId);
+                    if (result.success) {
+                        setRadniNalozi(prev => prev.map(n => 
+                            n.id === nalogId ? {
+                                ...n,
+                                otpremnicaIzdana: false,
+                                otpremnicaDatum: null,
+                                otpremnicaIzdaoIme: null
+                            } : n
+                        ));
+                    }
+                } catch (error) {
+                    alert('Greška: ' + error.message);
+                }
+            };
+
             // Print OTPREMNICA - za završene naloge (samo artikli i cijene)
             const printOtpremnica = (nalog) => {
                 const ukupnoBezPDV = (nalog.artikli || []).reduce((sum, a) => sum + (parseFloat(a.cijena || 0) * parseFloat(a.kolicina || 0)), 0);
@@ -7444,6 +7464,15 @@
                                                 {nalog.otpremnicaIzdana ? (
                                                     <span className="text-green-600 text-xs mr-2">
                                                         ✓ Otpremnica ({nalog.otpremnicaIzdaoIme}, {new Date(nalog.otpremnicaDatum).toLocaleString('hr-HR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})})
+                                                        {isAdmin && (
+                                                            <button
+                                                                onClick={() => cancelOtpremnica(nalog.id)}
+                                                                className="text-red-500 hover:text-red-700 ml-1"
+                                                                title="Poništi otpremnicu"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        )}
                                                     </span>
                                                 ) : (
                                                     <button

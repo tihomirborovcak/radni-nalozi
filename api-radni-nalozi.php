@@ -2998,6 +2998,22 @@ if ($endpoint === 'otpremnica') {
             'otpremnicaIzdaoIme' => trim(($user['ime'] ?? '') . ' ' . ($user['prezime'] ?? ''))
         ]);
     }
+    
+    // DELETE - poništi otpremnicu (samo admin)
+    if ($method === 'DELETE' && $id) {
+        if (!$userId) sendError('Unauthorized', 401);
+        
+        $stmt = $db->prepare("
+            UPDATE nalozi 
+            SET otpremnica_izdana = 0, 
+                otpremnica_datum = NULL, 
+                otpremnica_izdao = NULL 
+            WHERE id = ?
+        ");
+        $stmt->execute([$id]);
+        
+        sendResponse(['success' => true]);
+    }
 }
 
 // Endpoint nije pronađen
