@@ -4626,7 +4626,7 @@
                     (nalog.telefon ? '<div>Tel: ' + nalog.telefon + '</div>' : '') +
                     (nalog.email ? '<div>' + nalog.email + '</div>' : '') +
                     '</div></div></div>' +
-                    '<div class="document-title">OTPREMNICA - PREDRAČUN</div>' +
+                    '<div class="document-title">OTPREMNICA</div>' +
                     '<div style="display: flex; justify-content: space-between;"><div class="doc-info">' +
                     '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + nalog.broj + '</span></div>' +
                     '<div class="doc-info-row"><span class="doc-info-label">Mjesto:</span> <span>Zabok</span></div>' +
@@ -5683,7 +5683,116 @@
                 postupci: []
             });
 
-            // Print otpremnica/predračun
+            // Print RADNI NALOG - za naloge u tijeku (s podsjetnicima i materijalima)
+            const printRadniNalog = (nalog) => {
+                let artikliHTML = '';
+                (nalog.artikli || []).forEach((art, idx) => {
+                    const kol = parseFloat(art.kolicina) || 0;
+                    const cijena = parseFloat(art.cijena) || 0;
+                    const ukupno = kol * cijena;
+                    const napomena = [art.format, art.opis].filter(Boolean).join(' - ');
+                    
+                    artikliHTML += '<div class="artikl-box">';
+                    artikliHTML += '<div class="artikl-header">';
+                    artikliHTML += '<span class="artikl-num">' + (idx + 1) + '.</span> ';
+                    artikliHTML += (art.sifra ? '<span class="artikl-sifra">(' + art.sifra + ')</span> ' : '');
+                    artikliHTML += '<strong>' + (art.naziv || '') + '</strong>';
+                    artikliHTML += '<span class="artikl-qty">' + kol + ' ' + (art.jedinica || 'kom') + ' × ' + cijena.toFixed(2) + ' = <strong>' + ukupno.toFixed(2) + ' EUR</strong></span>';
+                    artikliHTML += '</div>';
+                    
+                    if (napomena) {
+                        artikliHTML += '<div class="artikl-napomena">📝 ' + napomena + '</div>';
+                    }
+                    
+                    // Podsjetnici
+                    if (art.podsjetnici && art.podsjetnici.length > 0) {
+                        artikliHTML += '<div class="podsjetnici-section"><strong>📌 Podsjetnici:</strong><ul>';
+                        art.podsjetnici.forEach(p => {
+                            const status = p.zavrsen ? '✓' : '○';
+                            artikliHTML += '<li class="' + (p.zavrsen ? 'done' : '') + '">' + status + ' ' + p.tekst + '</li>';
+                        });
+                        artikliHTML += '</ul></div>';
+                    }
+                    
+                    // Materijali
+                    if (art.materijali && art.materijali.length > 0) {
+                        artikliHTML += '<div class="materijali-section"><strong>🧱 Materijali:</strong><ul>';
+                        art.materijali.forEach(m => {
+                            artikliHTML += '<li>' + m.naziv + ': ' + m.kolicina + ' ' + (m.jedinicaMjere || '') + '</li>';
+                        });
+                        artikliHTML += '</ul></div>';
+                    }
+                    
+                    artikliHTML += '</div>';
+                });
+                
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(
+                    '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Radni nalog ' + nalog.broj + '</title>' +
+                    '<style>' +
+                    '* { margin: 0; padding: 0; box-sizing: border-box; }' +
+                    'body { font-family: Arial, sans-serif; font-size: 11px; padding: 10mm; color: #333; }' +
+                    '.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 10px; }' +
+                    '.logo { font-size: 20px; font-weight: bold; }' +
+                    '.document-title { font-size: 24px; font-weight: bold; text-align: center; margin: 15px 0; background: #f0f0f0; padding: 10px; }' +
+                    '.info-grid { display: flex; justify-content: space-between; margin-bottom: 15px; }' +
+                    '.info-box { flex: 1; padding: 10px; border: 1px solid #ddd; margin-right: 10px; }' +
+                    '.info-box:last-child { margin-right: 0; }' +
+                    '.info-box h4 { margin-bottom: 5px; color: #666; font-size: 10px; text-transform: uppercase; }' +
+                    '.info-box p { font-size: 12px; margin: 2px 0; }' +
+                    '.artikl-box { border: 1px solid #ccc; margin-bottom: 10px; padding: 10px; background: #fafafa; }' +
+                    '.artikl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }' +
+                    '.artikl-num { background: #333; color: #fff; padding: 2px 8px; border-radius: 3px; font-weight: bold; }' +
+                    '.artikl-sifra { color: #666; font-size: 10px; }' +
+                    '.artikl-qty { color: #333; }' +
+                    '.artikl-napomena { font-style: italic; color: #555; margin: 5px 0; padding: 5px; background: #fff3cd; border-radius: 3px; }' +
+                    '.podsjetnici-section, .materijali-section { margin-top: 8px; padding: 8px; background: #fff; border-radius: 3px; }' +
+                    '.podsjetnici-section { border-left: 3px solid #ffc107; }' +
+                    '.materijali-section { border-left: 3px solid #17a2b8; }' +
+                    'ul { margin-left: 20px; margin-top: 5px; }' +
+                    'li { margin: 3px 0; }' +
+                    'li.done { text-decoration: line-through; color: #888; }' +
+                    '.footer { margin-top: 20px; display: flex; justify-content: space-between; }' +
+                    '.signature-box { width: 200px; text-align: center; }' +
+                    '.signature-line { border-top: 1px solid #333; margin-top: 30px; padding-top: 5px; }' +
+                    '@media print { body { padding: 5mm; } @page { margin: 5mm; } }' +
+                    '</style></head><body>' +
+                    '<div class="header"><div>' +
+                    '<div class="logo">SIGNALprint</div>' +
+                    '<div style="font-size:9px;">vl. Tihomir Borovčak | Naselje Borovčaki 8, 49210 Zabok | Tel: 049/500-005</div>' +
+                    '</div><div style="text-align:right;">' +
+                    '<div style="font-size:10px;">Datum ispisa: ' + new Date().toLocaleDateString('hr-HR') + '</div>' +
+                    '</div></div>' +
+                    '<div class="document-title">RADNI NALOG ' + nalog.broj + '</div>' +
+                    '<div class="info-grid">' +
+                    '<div class="info-box"><h4>Klijent</h4>' +
+                    '<p><strong>' + (nalog.klijentNaziv || '-') + '</strong></p>' +
+                    '<p>' + (nalog.kontaktOsoba || '') + '</p>' +
+                    '<p>' + (nalog.telefon || '') + '</p>' +
+                    '</div>' +
+                    '<div class="info-box"><h4>Nalog</h4>' +
+                    '<p><strong>' + (nalog.nazivNaloga || '-') + '</strong></p>' +
+                    '<p>Datum: ' + new Date(nalog.datum).toLocaleDateString('hr-HR') + '</p>' +
+                    (nalog.rokIzrade ? '<p>Rok: <strong>' + new Date(nalog.rokIzrade).toLocaleDateString('hr-HR') + '</strong></p>' : '') +
+                    '</div>' +
+                    '<div class="info-box"><h4>Status</h4>' +
+                    '<p style="font-size:14px;"><strong>' + (nalog.status === 'zavrsen' ? '✓ Završen' : '⚙️ U tijeku') + '</strong></p>' +
+                    (nalog.brojRacuna ? '<p>Račun: ' + nalog.brojRacuna + '</p>' : '') +
+                    '</div>' +
+                    '</div>' +
+                    '<h3 style="margin-bottom:10px;">Artikli:</h3>' +
+                    artikliHTML +
+                    '<div class="footer">' +
+                    '<div class="signature-box"><div>Izradio:</div><div class="signature-line">_______________________</div></div>' +
+                    '<div class="signature-box"><div>Kontrolirao:</div><div class="signature-line">_______________________</div></div>' +
+                    '</div>' +
+                    '</body></html>'
+                );
+                printWindow.document.close();
+                printWindow.print();
+            };
+
+            // Print OTPREMNICA - za završene naloge (samo artikli i cijene)
             const printOtpremnica = (nalog) => {
                 const ukupnoBezPDV = (nalog.artikli || []).reduce((sum, a) => sum + (parseFloat(a.cijena || 0) * parseFloat(a.kolicina || 0)), 0);
                 const pdv = ukupnoBezPDV * 0.25;
@@ -7173,7 +7282,7 @@
                                                         if (!nalog.artikli || nalog.artikli.length === 0) {
                                                             fullNalog = await apiCall('nalozi/' + nalog.id, 'GET', null, userId);
                                                         }
-                                                        printOtpremnica(fullNalog);
+                                                        printRadniNalog(fullNalog);
                                                     }}
                                                     className="text-blue-600 hover:text-blue-900 mr-2"
                                                     title="Print otpremnica"
