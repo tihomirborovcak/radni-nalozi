@@ -4628,7 +4628,7 @@
                     '</div></div></div>' +
                     '<div class="document-title">OTPREMNICA</div>' +
                     '<div style="display: flex; justify-content: space-between;"><div class="doc-info">' +
-                    '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + nalog.broj + '</span></div>' +
+                    '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + (nalog.otpremnicaBroj || nalog.broj) + '</span></div>' +
                     '<div class="doc-info-row"><span class="doc-info-label">Mjesto:</span> <span>Zabok</span></div>' +
                     '<div class="doc-info-row"><span class="doc-info-label">Datum:</span> <span>' + new Date().toLocaleDateString('hr-HR') + '</span></div>' +
                     '</div><div class="doc-info">' +
@@ -4654,7 +4654,6 @@
                     '<div class="signature-box"><div>Preuzeo:</div><div class="signature-line">_______________________</div></div>' +
                     '</div>' +
                     '<div class="footer-note">Dokument je pravovaljan bez pečata i potpisa jer je ispisan elektroničkim putem.</div>' +
-                    '<div class="contact-footer">TEL: 049/500-005, E-MAIL: info@signalprint.hr, WEB: www.signalprint.hr, FB: signal.print.zabok, IG: signalprint_zabok</div>' +
                     '</body></html>'
                 );
                 printWindow.document.close();
@@ -5800,6 +5799,7 @@
                             n.id === nalogId ? {
                                 ...n,
                                 otpremnicaIzdana: true,
+                                otpremnicaBroj: result.otpremnicaBroj,
                                 otpremnicaDatum: result.otpremnicaDatum,
                                 otpremnicaIzdaoIme: result.otpremnicaIzdaoIme
                             } : n
@@ -5820,6 +5820,7 @@
                             n.id === nalogId ? {
                                 ...n,
                                 otpremnicaIzdana: false,
+                                otpremnicaBroj: null,
                                 otpremnicaDatum: null,
                                 otpremnicaIzdaoIme: null
                             } : n
@@ -5901,7 +5902,7 @@
                     '</div></div></div>' +
                     '<div class="document-title">OTPREMNICA</div>' +
                     '<div style="display: flex; justify-content: space-between;"><div class="doc-info">' +
-                    '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + nalog.broj + '</span></div>' +
+                    '<div class="doc-info-row"><span class="doc-info-label">BROJ:</span> <span>' + (nalog.otpremnicaBroj || nalog.broj) + '</span></div>' +
                     '<div class="doc-info-row"><span class="doc-info-label">Mjesto:</span> <span>Zabok</span></div>' +
                     '<div class="doc-info-row"><span class="doc-info-label">Datum:</span> <span>' + new Date().toLocaleDateString('hr-HR') + '</span></div>' +
                     '</div><div class="doc-info">' +
@@ -5927,7 +5928,6 @@
                     '<div class="signature-box"><div>Preuzeo:</div><div class="signature-line">_______________________</div></div>' +
                     '</div>' +
                     '<div class="footer-note">Dokument je pravovaljan bez pečata i potpisa jer je ispisan elektroničkim putem.</div>' +
-                    '<div class="contact-footer">TEL: 049/500-005, E-MAIL: info@signalprint.hr, WEB: www.signalprint.hr, FB: signal.print.zabok, IG: signalprint_zabok</div>' +
                     '</body></html>'
                 );
                 printWindow.document.close();
@@ -7461,9 +7461,9 @@
                                                 </td>
                                                 <td className="px-3 py-2 text-right">{getUkupnaCijena(nalog).toFixed(2)} EUR</td>
                                                 <td className="px-3 py-2 text-right">
-                                                {nalog.otpremnicaIzdana ? (
+                                                {nalog.otpremnicaIzdana && (
                                                     <span className="text-green-600 text-xs mr-2">
-                                                        ✓ Otpremnica ({nalog.otpremnicaIzdaoIme}, {new Date(nalog.otpremnicaDatum).toLocaleString('hr-HR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})})
+                                                        ✓ {nalog.otpremnicaBroj} ({nalog.otpremnicaIzdaoIme}, {new Date(nalog.otpremnicaDatum).toLocaleString('hr-HR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})})
                                                         {isAdmin && (
                                                             <button
                                                                 onClick={() => cancelOtpremnica(nalog.id)}
@@ -7474,20 +7474,30 @@
                                                             </button>
                                                         )}
                                                     </span>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => markOtpremnicaIzdana(nalog.id)}
-                                                        className="text-orange-600 hover:text-orange-800 mr-2 text-xs"
-                                                        title="Označi otpremnicu izdanom"
-                                                    >
-                                                        📋 Izdaj
-                                                    </button>
                                                 )}
                                                 <button
                                                     onClick={async () => {
                                                         let fullNalog = nalog;
                                                         if (!nalog.artikli || nalog.artikli.length === 0) {
                                                             fullNalog = await apiCall('nalozi/' + nalog.id, 'GET', null, userId);
+                                                        }
+                                                        // Ako nije izdana, prvo izdaj pa printi
+                                                        if (!nalog.otpremnicaIzdana) {
+                                                            const result = await apiCall('otpremnica/' + nalog.id, 'POST', {}, userId);
+                                                            if (result.success) {
+                                                                fullNalog.otpremnicaBroj = result.otpremnicaBroj;
+                                                                setRadniNalozi(prev => prev.map(n => 
+                                                                    n.id === nalog.id ? {
+                                                                        ...n,
+                                                                        otpremnicaIzdana: true,
+                                                                        otpremnicaBroj: result.otpremnicaBroj,
+                                                                        otpremnicaDatum: result.otpremnicaDatum,
+                                                                        otpremnicaIzdaoIme: result.otpremnicaIzdaoIme
+                                                                    } : n
+                                                                ));
+                                                            }
+                                                        } else {
+                                                            fullNalog.otpremnicaBroj = nalog.otpremnicaBroj;
                                                         }
                                                         printOtpremnica(fullNalog);
                                                     }}

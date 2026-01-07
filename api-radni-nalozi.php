@@ -838,6 +838,7 @@ if ($endpoint === 'nalozi') {
                 'obrisanBy' => $n['obrisan_by'] ? (string)$n['obrisan_by'] : null,
                 'obrisaoIme' => $n['obrisao_ime'] ?? null,
                 'otpremnicaIzdana' => (bool)($n['otpremnica_izdana'] ?? false),
+                'otpremnicaBroj' => $n['otpremnica_broj'] ?? null,
                 'otpremnicaDatum' => $n['otpremnica_datum'] ?? null,
                 'otpremnicaIzdao' => $n['otpremnica_izdao'] ?? null,
                 'otpremnicaIzdaoIme' => $n['otpremnica_izdao_ime'] ?? null,
@@ -2977,14 +2978,23 @@ if ($endpoint === 'otpremnica') {
     if ($method === 'POST' && $id) {
         if (!$userId) sendError('Unauthorized', 401);
         
+        // Generiraj broj otpremnice (OTP-YYYY-NNN)
+        $year = date('Y');
+        $stmtMax = $db->prepare("SELECT MAX(CAST(SUBSTRING(otpremnica_broj, 10) AS UNSIGNED)) as max_num FROM nalozi WHERE otpremnica_broj LIKE ?");
+        $stmtMax->execute(["OTP-$year-%"]);
+        $result = $stmtMax->fetch();
+        $nextNum = ($result['max_num'] ?? 0) + 1;
+        $otpremnicaBroj = sprintf("OTP-%s-%03d", $year, $nextNum);
+        
         $stmt = $db->prepare("
             UPDATE nalozi 
-            SET otpremnica_izdana = 1, 
+            SET otpremnica_izdana = 1,
+                otpremnica_broj = ?,
                 otpremnica_datum = NOW(), 
                 otpremnica_izdao = ? 
             WHERE id = ?
         ");
-        $stmt->execute([$userId, $id]);
+        $stmt->execute([$otpremnicaBroj, $userId, $id]);
         
         // Dohvati ime operatera
         $stmtUser = $db->prepare("SELECT ime, prezime FROM korisnici WHERE id = ?");
@@ -2994,6 +3004,7 @@ if ($endpoint === 'otpremnica') {
         sendResponse([
             'success' => true,
             'otpremnicaIzdana' => true,
+            'otpremnicaBroj' => $otpremnicaBroj,
             'otpremnicaDatum' => date('Y-m-d H:i:s'),
             'otpremnicaIzdaoIme' => trim(($user['ime'] ?? '') . ' ' . ($user['prezime'] ?? ''))
         ]);
