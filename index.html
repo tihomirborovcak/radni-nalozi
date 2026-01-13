@@ -1941,7 +1941,7 @@
             const [formData, setFormData] = useState({
                 naziv: '',
                 adresa: '',
-                grad: '',
+                mjesto: '',
                 postanskiBroj: '',
                 oib: '',
                 kontaktOsoba: '',
@@ -1958,7 +1958,7 @@
                     (k.minimax_id && k.minimax_id.toString().includes(search)) ||
                     (k.telefon && k.telefon.includes(search)) ||
                     (k.email && k.email.toLowerCase().includes(search)) ||
-                    (k.grad && k.grad.toLowerCase().includes(search)) ||
+                    (k.mjesto && k.mjesto.toLowerCase().includes(search)) ||
                     (k.kontaktOsoba && k.kontaktOsoba.toLowerCase().includes(search))
                 );
             });
@@ -2009,7 +2009,7 @@
             };
 
             const resetForm = () => {
-                setFormData({ naziv: '', adresa: '', grad: '', postanskiBroj: '', oib: '', kontaktOsoba: '', telefon: '', email: '', minimax_id: '' });
+                setFormData({ naziv: '', adresa: '', mjesto: '', postanskiBroj: '', oib: '', kontaktOsoba: '', telefon: '', email: '', minimax_id: '' });
                 setEditingId(null);
                 setShowForm(false);
             };
@@ -2097,11 +2097,11 @@
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium mb-0.5">Grad</label>
+                                <label className="block text-xs font-medium mb-0.5">Mjesto</label>
                                 <input
                                     type="text"
-                                    value={formData.grad}
-                                    onChange={(e) => setFormData({ ...formData, grad: e.target.value })}
+                                    value={formData.mjesto || ''}
+                                    onChange={(e) => setFormData({ ...formData, mjesto: e.target.value })}
                                     className="w-full border rounded px-2 py-1 text-sm"
                                     disabled={saving}
                                 />
@@ -4559,6 +4559,11 @@
 
             // Print otpremnica/predračun
             const printOtpremnica = (nalog) => {
+                // Pronađi kupca po ID-u ili po nazivu ako ID ne postoji
+                let klijent = nalog.klijentId ? kupci.find(k => String(k.id) === String(nalog.klijentId)) : null;
+                if (!klijent && nalog.klijentNaziv) {
+                    klijent = kupci.find(k => k.naziv === nalog.klijentNaziv);
+                }
                 const ukupnoBezPDV = (nalog.artikli || []).reduce((sum, a) => sum + (parseFloat(a.cijena || 0) * parseFloat(a.kolicina || 0)), 0);
                 const pdv = ukupnoBezPDV * 0.25;
                 const ukupnoSaPDV = ukupnoBezPDV + pdv;
@@ -4622,6 +4627,9 @@
                     '<div class="company-info" style="margin-top: 5px;">vl. Tihomir Borovčak<br>Naselje Borovčaki 8<br>HR-49210 Zabok<br><br>OIB 52276562396<br><br>IBAN ZABA: HR8923600001101163526<br>IBAN PBZ: HR7723400091160234176</div>' +
                     '</div><div style="text-align: right;"><div class="client-box">' +
                     '<div class="client-name">' + (nalog.klijentNaziv || '') + '</div>' +
+                    (klijent?.adresa ? '<div>' + klijent.adresa + '</div>' : '') +
+                    (klijent?.postanskiBroj || klijent?.mjesto ? '<div>' + [klijent.postanskiBroj, klijent.mjesto].filter(Boolean).join(' ') + '</div>' : '') +
+                    (klijent?.oib ? '<div>OIB: ' + klijent.oib + '</div>' : '') +
                     (nalog.kontaktOsoba ? '<div>' + nalog.kontaktOsoba + '</div>' : '') +
                     (nalog.telefon ? '<div>Tel: ' + nalog.telefon + '</div>' : '') +
                     (nalog.email ? '<div>' + nalog.email + '</div>' : '') +
@@ -4832,6 +4840,10 @@
                         ...formData,
                         klijentId: klijent.id,
                         klijentNaziv: klijent.naziv,
+                        klijentAdresa: klijent.adresa || '',
+                        klijentMjesto: klijent.mjesto || '',
+                        klijentPostanskiBroj: klijent.postanskiBroj || '',
+                        klijentOib: klijent.oib || '',
                         kontaktOsoba: klijent.kontakt || '',
                         telefon: klijent.telefon || '',
                         email: klijent.email || ''
@@ -5833,6 +5845,11 @@
 
             // Print OTPREMNICA - za završene naloge (samo artikli i cijene)
             const printOtpremnica = (nalog) => {
+                // Pronađi kupca po ID-u ili po nazivu ako ID ne postoji
+                let klijent = nalog.klijentId ? kupci.find(k => String(k.id) === String(nalog.klijentId)) : null;
+                if (!klijent && nalog.klijentNaziv) {
+                    klijent = kupci.find(k => k.naziv === nalog.klijentNaziv);
+                }
                 const ukupnoBezPDV = (nalog.artikli || []).reduce((sum, a) => sum + (parseFloat(a.cijena || 0) * parseFloat(a.kolicina || 0)), 0);
                 const pdv = ukupnoBezPDV * 0.25;
                 const ukupnoSaPDV = ukupnoBezPDV + pdv;
@@ -5896,6 +5913,9 @@
                     '<div class="company-info" style="margin-top: 5px;">vl. Tihomir Borovčak<br>Naselje Borovčaki 8<br>HR-49210 Zabok<br><br>OIB 52276562396<br><br>IBAN ZABA: HR8923600001101163526<br>IBAN PBZ: HR7723400091160234176</div>' +
                     '</div><div style="text-align: right;"><div class="client-box">' +
                     '<div class="client-name">' + (nalog.klijentNaziv || '') + '</div>' +
+                    (klijent?.adresa ? '<div>' + klijent.adresa + '</div>' : '') +
+                    (klijent?.postanskiBroj || klijent?.mjesto ? '<div>' + [klijent.postanskiBroj, klijent.mjesto].filter(Boolean).join(' ') + '</div>' : '') +
+                    (klijent?.oib ? '<div>OIB: ' + klijent.oib + '</div>' : '') +
                     (nalog.kontaktOsoba ? '<div>' + nalog.kontaktOsoba + '</div>' : '') +
                     (nalog.telefon ? '<div>Tel: ' + nalog.telefon + '</div>' : '') +
                     (nalog.email ? '<div>' + nalog.email + '</div>' : '') +
@@ -6392,7 +6412,11 @@
                     ...formData,
                     klijentId: klijentId,
                     klijentNaziv: klijent ? klijent.naziv : '',
-                    kontaktOsoba: klijent ? klijent.kontaktOsoba : '',
+                    klijentAdresa: klijent ? klijent.adresa : '',
+                    klijentMjesto: klijent ? klijent.mjesto : '',
+                    klijentPostanskiBroj: klijent ? klijent.postanskiBroj : '',
+                    klijentOib: klijent ? klijent.oib : '',
+                    kontaktOsoba: klijent ? klijent.kontakt : '',
                     telefon: klijent ? klijent.telefon : '',
                     email: klijent ? klijent.email : ''
                 });
@@ -6645,6 +6669,10 @@
                                                 ...formData,
                                                 klijentId: klijentId,
                                                 klijentNaziv: klijent?.naziv || '',
+                                                klijentAdresa: klijent?.adresa || '',
+                                                klijentMjesto: klijent?.mjesto || '',
+                                                klijentPostanskiBroj: klijent?.postanskiBroj || '',
+                                                klijentOib: klijent?.oib || '',
                                                 kontaktOsoba: klijent?.kontakt || '',
                                                 telefon: klijent?.telefon || '',
                                                 email: klijent?.email || ''
