@@ -232,6 +232,40 @@ function formatBytes($bytes) {
     return round($bytes / (1024 * 1024), 1) . ' MB';
 }
 
+// GET - lista svih backupa
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['download'])) {
+    $backupDir = __DIR__ . '/backups';
+
+    if (!is_dir($backupDir)) {
+        header('Content-Type: application/json');
+        echo json_encode([]);
+        exit;
+    }
+
+    $backups = glob("{$backupDir}/backup_*.zip");
+    usort($backups, function($a, $b) {
+        return filemtime($b) - filemtime($a);
+    });
+
+    $result = array_map(function($file) {
+        $filename = basename($file);
+        $size = filesize($file);
+        $timestamp = filemtime($file);
+
+        return [
+            'filename' => $filename,
+            'size' => $size,
+            'sizeFormatted' => formatBytes($size),
+            'date' => date('d.m.Y H:i', $timestamp),
+            'timestamp' => $timestamp
+        ];
+    }, $backups);
+
+    header('Content-Type: application/json');
+    echo json_encode($result);
+    exit;
+}
+
 // Download handler
 if (isset($_GET['download'])) {
     $filename = basename($_GET['download']);

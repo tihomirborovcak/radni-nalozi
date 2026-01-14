@@ -4543,20 +4543,42 @@
         // Backup Button komponenta
         function BackupButton({ userId }) {
             const [creating, setCreating] = useState(false);
-            const [lastBackup, setLastBackup] = useState(null);
+            const [backups, setBackups] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            const backupUrl = API_URL.replace('api-radni-nalozi.php', 'backup.php');
+
+            // Učitaj listu backupa
+            React.useEffect(() => {
+                loadBackups();
+            }, []);
+
+            const loadBackups = async () => {
+                try {
+                    const response = await fetch(backupUrl, {
+                        headers: { 'X-User-Id': userId }
+                    });
+                    const data = await response.json();
+                    setBackups(data || []);
+                } catch (error) {
+                    console.error('Greška pri učitavanju backupa:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
 
             const createBackup = async () => {
                 setCreating(true);
                 try {
-                    const response = await fetch(`${API_URL.replace('api-radni-nalozi.php', 'backup.php')}`, {
+                    const response = await fetch(backupUrl, {
                         method: 'POST',
                         headers: { 'X-User-Id': userId }
                     });
                     const result = await response.json();
 
                     if (result.success) {
-                        setLastBackup(result);
                         alert(`Backup kreiran: ${result.filename} (${result.sizeFormatted})`);
+                        loadBackups();
                     } else {
                         alert(result.error || 'Greška pri kreiranju backupa');
                     }
@@ -4567,28 +4589,52 @@
                 }
             };
 
-            const downloadBackup = () => {
-                if (lastBackup) {
-                    window.open(`${API_URL.replace('api-radni-nalozi.php', 'backup.php')}?download=${lastBackup.filename}`, '_blank');
-                }
+            const downloadBackup = (filename) => {
+                window.open(`${backupUrl}?download=${filename}`, '_blank');
             };
 
             return (
-                <div className="flex items-center gap-3">
+                <div>
                     <button
                         onClick={createBackup}
                         disabled={creating}
-                        className={`px-4 py-2 rounded text-white text-sm font-medium ${creating ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                        className={`px-4 py-2 rounded text-white text-sm font-medium mb-3 ${creating ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
                     >
-                        {creating ? 'Kreiranje...' : 'Kreiraj Backup'}
+                        {creating ? 'Kreiranje...' : '+ Kreiraj novi backup'}
                     </button>
-                    {lastBackup && (
-                        <button
-                            onClick={downloadBackup}
-                            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
-                        >
-                            Preuzmi ({lastBackup.sizeFormatted})
-                        </button>
+
+                    {loading ? (
+                        <p className="text-sm text-gray-500">Učitavanje...</p>
+                    ) : backups.length === 0 ? (
+                        <p className="text-sm text-gray-500">Nema spremljenih backupa</p>
+                    ) : (
+                        <div className="border rounded overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="text-left px-3 py-2">Datum</th>
+                                        <th className="text-left px-3 py-2">Veličina</th>
+                                        <th className="text-right px-3 py-2">Akcija</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {backups.map((backup, idx) => (
+                                        <tr key={backup.filename} className={idx % 2 ? 'bg-gray-50' : ''}>
+                                            <td className="px-3 py-2">{backup.date}</td>
+                                            <td className="px-3 py-2">{backup.sizeFormatted}</td>
+                                            <td className="px-3 py-2 text-right">
+                                                <button
+                                                    onClick={() => downloadBackup(backup.filename)}
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                >
+                                                    Preuzmi
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
             );
