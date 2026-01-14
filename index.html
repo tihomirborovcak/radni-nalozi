@@ -4527,6 +4527,69 @@
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Backup sekcija */}
+                    <div className="bg-white rounded-lg shadow-sm border p-4 mt-6">
+                        <h3 className="text-lg font-semibold mb-3">💾 Backup</h3>
+                        <p className="text-sm text-gray-600 mb-3">
+                            Kreiraj backup baze podataka i uploadanih fajlova (ZIP).
+                        </p>
+                        <BackupButton userId={userId} />
+                    </div>
+                </div>
+            );
+        }
+
+        // Backup Button komponenta
+        function BackupButton({ userId }) {
+            const [creating, setCreating] = useState(false);
+            const [lastBackup, setLastBackup] = useState(null);
+
+            const createBackup = async () => {
+                setCreating(true);
+                try {
+                    const response = await fetch(`${API_URL.replace('api-radni-nalozi.php', 'backup.php')}`, {
+                        method: 'POST',
+                        headers: { 'X-User-Id': userId }
+                    });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        setLastBackup(result);
+                        alert(`Backup kreiran: ${result.filename} (${result.sizeFormatted})`);
+                    } else {
+                        alert(result.error || 'Greška pri kreiranju backupa');
+                    }
+                } catch (error) {
+                    alert('Greška: ' + error.message);
+                } finally {
+                    setCreating(false);
+                }
+            };
+
+            const downloadBackup = () => {
+                if (lastBackup) {
+                    window.open(`${API_URL.replace('api-radni-nalozi.php', 'backup.php')}?download=${lastBackup.filename}`, '_blank');
+                }
+            };
+
+            return (
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={createBackup}
+                        disabled={creating}
+                        className={`px-4 py-2 rounded text-white text-sm font-medium ${creating ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                    >
+                        {creating ? 'Kreiranje...' : 'Kreiraj Backup'}
+                    </button>
+                    {lastBackup && (
+                        <button
+                            onClick={downloadBackup}
+                            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                        >
+                            Preuzmi ({lastBackup.sizeFormatted})
+                        </button>
+                    )}
                 </div>
             );
         }
