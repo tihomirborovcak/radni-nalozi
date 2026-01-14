@@ -97,7 +97,40 @@ try {
         copyDirectory($uploadsDir, $uploadsBackupDir);
     }
 
-    // 3. KREIRAJ ZIP
+    // 3. BACKUP APLIKACIJSKIH FAJLOVA
+    $appBackupDir = "{$tempDir}/app";
+    mkdir($appBackupDir, 0755, true);
+
+    // Fajlovi i folderi za preskočiti
+    $skipItems = ['uploads', 'backups', '.git', '.claude', 'config.php', 'nul'];
+    $skipPatterns = ['tmpclaude-'];
+
+    $items = scandir(__DIR__);
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') continue;
+        if (in_array($item, $skipItems)) continue;
+
+        // Provjeri pattern
+        $skip = false;
+        foreach ($skipPatterns as $pattern) {
+            if (strpos($item, $pattern) === 0) {
+                $skip = true;
+                break;
+            }
+        }
+        if ($skip) continue;
+
+        $sourcePath = __DIR__ . '/' . $item;
+        $destPath = $appBackupDir . '/' . $item;
+
+        if (is_dir($sourcePath)) {
+            copyDirectory($sourcePath, $destPath);
+        } else {
+            copy($sourcePath, $destPath);
+        }
+    }
+
+    // 4. KREIRAJ ZIP
     $zipFile = "{$backupPath}.zip";
     $zip = new ZipArchive();
 
@@ -109,10 +142,10 @@ try {
     addFolderToZip($zip, $tempDir, '');
     $zip->close();
 
-    // 4. OBRIŠI TEMP FOLDER
+    // 5. OBRIŠI TEMP FOLDER
     deleteDirectory($tempDir);
 
-    // 5. OBRIŠI STARE BACKUPE (zadrži zadnjih 10)
+    // 6. OBRIŠI STARE BACKUPE (zadrži zadnjih 10)
     $backups = glob("{$backupDir}/backup_*.zip");
     usort($backups, function($a, $b) {
         return filemtime($b) - filemtime($a);
