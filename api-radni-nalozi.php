@@ -856,8 +856,50 @@ if ($endpoint === 'nalozi') {
         sendResponse($result);
     }
     
+    // GET attachments za nalog
+    if ($method === 'GET' && $id && isset($pathParts[2]) && $pathParts[2] === 'attachments') {
+        // Kreiraj tablicu ako ne postoji
+        $db->exec("CREATE TABLE IF NOT EXISTS nalog_attachments (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            nalog_id INT NOT NULL,
+            filename VARCHAR(255) NOT NULL,
+            original_filename VARCHAR(255) NOT NULL,
+            file_path VARCHAR(500) NOT NULL,
+            file_size INT,
+            mime_type VARCHAR(100),
+            created_by INT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted_at TIMESTAMP NULL
+        )");
+
+        $stmt = $db->prepare("
+            SELECT a.*, k.ime as kreirao_ime
+            FROM nalog_attachments a
+            LEFT JOIN korisnici k ON k.id = a.created_by
+            WHERE a.nalog_id = ? AND a.deleted_at IS NULL
+            ORDER BY a.created_at DESC
+        ");
+        $stmt->execute([$id]);
+        $attachments = $stmt->fetchAll();
+
+        $result = array_map(function($a) {
+            return [
+                'id' => (int)$a['id'],
+                'filename' => $a['filename'],
+                'originalFilename' => $a['original_filename'],
+                'filePath' => $a['file_path'],
+                'fileSize' => (int)$a['file_size'],
+                'mimeType' => $a['mime_type'],
+                'kreiraoIme' => $a['kreirao_ime'],
+                'createdAt' => $a['created_at']
+            ];
+        }, $attachments);
+
+        sendResponse($result);
+    }
+
     // GET by ID - sa artiklima i postupcima
-    if ($method === 'GET' && $id) {
+    if ($method === 'GET' && $id && !isset($pathParts[2])) {
         $stmt = $db->prepare("SELECT * FROM nalozi WHERE id = ?");
         $stmt->execute([$id]);
         $nalog = $stmt->fetch();
@@ -3023,6 +3065,172 @@ if ($endpoint === 'otpremnica') {
         ");
         $stmt->execute([$id]);
         
+        sendResponse(['success' => true]);
+    }
+}
+
+// ============================================
+// ATTACHMENTI - Fotografije/dokumenti uz naloge
+// ============================================
+if ($endpoint === 'attachments') {
+
+    // Kreiraj tablicu ako ne postoji
+    $db->exec("CREATE TABLE IF NOT EXISTS nalog_attachments (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        nalog_id INT NOT NULL,
+        filename VARCHAR(255) NOT NULL,
+        original_filename VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_size INT,
+        mime_type VARCHAR(100),
+        created_by INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMP NULL
+    )");
+
+    // POST - upload attachment
+    if ($method === 'POST') {
+        if (!$userId) sendError('Unauthorized', 401);
+
+        $nalogId = $_POST['nalog_id'] ?? null;
+        if (!$nalogId) sendError('nalog_id je obavezan', 400);
+
+        if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+            sendError('Greška pri uploadu fajla', 400);
+        }
+
+        $file = $_FILES['file'];
+        $originalName = $file['name'];
+        $tmpPath = $file['tmp_name'];
+        $mimeType = $file['type'];
+        $fileSize = $file['size'];
+
+        // Dozvoljeni tipovi
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf'];
+
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if (!in_array($mimeType, $allowedTypes) || !in_array($extension, $allowedExtensions)) {
+            sendError('Dozvoljeni su samo JPG, PNG, GIF i PDF fajlovi', 400);
+        }
+
+        // Upload folder
+        $uploadDir = __DIR__ . '/uploads/nalozi/' . $nalogId;
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        // Generiraj jedinstveno ime
+        $uniqueName = time() . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
+        $targetPath = $uploadDir . '/' . $uniqueName;
+        $relativePath = 'uploads/nalozi/' . $nalogId . '/' . $uniqueName;
+
+        // Ako je slika, komprimiraj na max 1MB
+        $maxSize = 1024 * 1024; // 1MB
+
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif'])) {
+            // Učitaj sliku
+            $image = null;
+            if ($extension === 'png') {
+                $image = @imagecreatefrompng($tmpPath);
+            } elseif ($extension === 'gif') {
+                $image = @imagecreatefromgif($tmpPath);
+            } else {
+                $image = @imagecreatefromjpeg($tmpPath);
+            }
+
+            if ($image) {
+                $width = imagesx($image);
+                $height = imagesy($image);
+
+                // Ako je fajl prevelik, smanji dimenzije
+                $quality = 85;
+                $maxDimension = 2000;
+
+                // Smanji ako je veća od maxDimension
+                if ($width > $maxDimension || $height > $maxDimension) {
+                    $ratio = min($maxDimension / $width, $maxDimension / $height);
+                    $newWidth = (int)($width * $ratio);
+                    $newHeight = (int)($height * $ratio);
+
+                    $resized = imagecreatetruecolor($newWidth, $newHeight);
+
+                    // Očuvaj transparentnost za PNG
+                    if ($extension === 'png') {
+                        imagealphablending($resized, false);
+                        imagesavealpha($resized, true);
+                    }
+
+                    imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+                    imagedestroy($image);
+                    $image = $resized;
+                }
+
+                // Spremi komprimiranu sliku
+                if ($extension === 'png') {
+                    imagepng($image, $targetPath, 6); // Kompresija 0-9
+                } elseif ($extension === 'gif') {
+                    imagegif($image, $targetPath);
+                } else {
+                    // Za JPEG, iterativno smanji kvalitetu dok nije ispod 1MB
+                    imagejpeg($image, $targetPath, $quality);
+
+                    while (filesize($targetPath) > $maxSize && $quality > 20) {
+                        $quality -= 10;
+                        imagejpeg($image, $targetPath, $quality);
+                    }
+                }
+
+                imagedestroy($image);
+                $fileSize = filesize($targetPath);
+            } else {
+                // Ako ne može učitati kao sliku, samo kopiraj
+                move_uploaded_file($tmpPath, $targetPath);
+            }
+        } else {
+            // PDF - samo kopiraj, ali provjeri veličinu
+            if ($fileSize > $maxSize * 10) { // Max 10MB za PDF
+                sendError('PDF fajl je prevelik (max 10MB)', 400);
+            }
+            move_uploaded_file($tmpPath, $targetPath);
+        }
+
+        // Spremi u bazu
+        $stmt = $db->prepare("
+            INSERT INTO nalog_attachments (nalog_id, filename, original_filename, file_path, file_size, mime_type, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $nalogId,
+            $uniqueName,
+            $originalName,
+            $relativePath,
+            $fileSize,
+            $mimeType,
+            $userId
+        ]);
+
+        $newId = $db->lastInsertId();
+
+        sendResponse([
+            'success' => true,
+            'id' => (int)$newId,
+            'filename' => $uniqueName,
+            'originalFilename' => $originalName,
+            'filePath' => $relativePath,
+            'fileSize' => $fileSize,
+            'mimeType' => $mimeType
+        ]);
+    }
+
+    // DELETE - soft delete attachment
+    if ($method === 'DELETE' && $id) {
+        if (!$userId) sendError('Unauthorized', 401);
+
+        $stmt = $db->prepare("UPDATE nalog_attachments SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL");
+        $stmt->execute([$id]);
+
         sendResponse(['success' => true]);
     }
 }
